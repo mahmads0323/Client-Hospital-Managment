@@ -4,6 +4,9 @@ import Loader from "../../../Components/loader";
 import { SampleNotifications } from "../../../sampleData/sampleNotification";
 import NotificationTable from "../../../Components/notificationTable";
 import CustomLink from "../../../Components/link";
+import getAdminUsingCookie from "../../../services/admin/getAdminUsingCookie";
+import useErrorContext from "../../../context/errorContext";
+import getAllNotification from "../../../services/notification/getAllNotification";
 
 const sampleAdmin = SampleAdmins[0];
 const itemsToShowAtATime = 5;
@@ -21,27 +24,42 @@ export default function Home() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalNotifications, setTotalNotifucations] = useState(0);
 
+  const { addError } = useErrorContext();
+
   const makeAdminDataRequest = async () => {
     setAdminLoading(true);
-    setTimeout(() => {
-      setAdmin(sampleAdmin);
+    const { responseData, error } = await getAdminUsingCookie();
+    if (error) {
+      addError(error);
       setAdminLoading(false);
-    }, 500);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setAdminLoading(false);
+      return;
+    }
+    setAdmin(responseData.data);
+    setAdminLoading(false);
   };
 
-  const makeAdminNotificationRequest = () => {
+  const makeAdminNotificationRequest = async () => {
     setNotificationLoading(true);
-    setTimeout(() => {
-      const tempNotifications = SampleNotifications.filter(
-        (notificationItem) => !notificationItem.viewedBy.admin
-      );
-      setTotalNotifucations(tempNotifications.length);
-      setNotifications(
-        tempNotifications.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempNotifications.length); // for now
-      setNotificationLoading(false);
-    }, 500);
+    const {repsonseData, error} = await getAllNotification(itemsToShowAtATime, itemsRange.start);
+    if(error){
+      addError(error)
+      setNotificationLoading(false)
+      return;
+    }
+    if(!repsonseData.data){
+      addError(repsonseData.message)
+      setNotificationLoading(false)
+      return;
+    }
+
+    setTotalItems(repsonseData.count)
+    setNotifications(repsonseData.data)
+    setNotificationLoading(false)
   };
 
   useEffect(() => {

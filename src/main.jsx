@@ -5,15 +5,18 @@ import "./index.css";
 import { BrowserRouter } from "react-router-dom";
 import ErrorContextProvider from "./context/errorContext/context.jsx";
 import UserContextProvider from "./context/userContext/context.jsx";
+import { CookiesProvider } from "react-cookie";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <UserContextProvider>
+    <BrowserRouter>
       <ErrorContextProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <CookiesProvider defaultSetOptions>
+          <UserContextProvider>
+            <App />
+          </UserContextProvider>
+        </CookiesProvider>
       </ErrorContextProvider>
-    </UserContextProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );

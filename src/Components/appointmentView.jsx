@@ -3,9 +3,13 @@ import { SampleAppintments } from "../sampleData/sampleAppointments";
 import Loader from "./loader";
 import Button from "./button";
 import { useNavigate, useParams } from "react-router-dom";
-import { SampleDoctors } from "../sampleData/sampleDoctors";
-import { sendNotification } from "./utils/sendNotification";
 import NotFoundPage from "../pages/not-found";
+import getAppointmentById from "../services/appointment/getById";
+import useErrorContext from "../context/errorContext";
+import deleteAppointmentById from "../services/appointment/deleteById";
+import createNotification from "../services/notification/createNotification";
+import approveAppointmentById from "../services/appointment/approve";
+import addPostDetails from "../services/appointment/addPostDetais";
 
 export default function AppointmentView({ viewRole = "patient" }) {
   const params = useParams();
@@ -14,118 +18,94 @@ export default function AppointmentView({ viewRole = "patient" }) {
   const [appointmentDetails, setAppointmentDetails] = useState({});
   const [appointmentDetailsFound, setAppointmentDetailsFound] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [appointmentTimePassed, setAppointmentTimePassed] = useState(false);
-
   const [appointmentPostDetails, setAppointmentPostDetails] = useState("");
 
   const navigate = useNavigate();
+  const { addError } = useErrorContext();
 
-  const makeDataRequest = () => {
-    setTimeout(() => {
-      const temp = SampleAppintments.find((e) => e.id == appointmentId);
-      if (!temp) {
-        setIsLoading(false);
-        setAppointmentDetailsFound(false);
-        return;
-      }
-      const tempIndex = SampleAppintments.findIndex((e) => e.id == temp.id);
-
-      // check wether apppointment time has passed or not
-      if (!temp.timePassed) {
-        const appointmentDayDate = temp.dated;
-        const appointmentDayHours = temp.hoursTime;
-        const currentDayDate = Date.now();
-        const currentDayHours = new Date(currentDayDate).getUTCHours();
-        // checking for time passed for appointment
-        if (
-          currentDayDate >= appointmentDayDate &&
-          currentDayHours >= appointmentDayHours
-        ) {
-          temp.timePassed = true;
-          setAppointmentTimePassed(true);
-
-          // checking if the status is pending after time has passed, so change it to deleted
-          if (temp.status == "pending") {
-            temp.status = "deleted";
-          }
-
-          // updating appointment data
-          SampleAppintments[tempIndex] = temp;
-        }
-      } else {
-        setAppointmentTimePassed(true);
-      }
-
-      setAppointmentDetails(temp);
+  const makeDataRequest = async () => {
+    setIsLoading(false);
+    setAppointmentDetailsFound(false);
+    const { responseData, error } = await getAppointmentById(appointmentId);
+    if (error) {
+      addError(error);
       setIsLoading(false);
-      setAppointmentDetailsFound(true);
-    }, 500);
+      setAppointmentDetailsFound(false);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setIsLoading(false);
+      setAppointmentDetailsFound(false);
+      return;
+    }
+    setAppointmentDetails(responseData.data);
+    setIsLoading(false);
+    setAppointmentDetailsFound(true);
+    console.log("Data: ", responseData.data);
   };
 
   const handleGoBack = () => {
     navigate(-1);
   };
 
-  const handleDeleteAppointment = () => {
-    // get appointment data
-    const tempAppointment = SampleAppintments.find(
-      (appointmentItem) => appointmentItem.id == appointmentId
-    );
+  const sendNotification = async (fromId, toId, fromName, title, message) => {
+    const { responseData, error } = await createNotification({
+      fromId,
+      toId,
+      fromName,
+      title,
+      message,
+    });
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!responseData.added) {
+      addError(responseData.message);
+      return;
+    }
+  };
 
-    // update doctor time table
-    const tempDoctor = SampleDoctors.find(
-      (doctorItem) => doctorItem.id == tempAppointment.doctorId
-    );
-    const tempDoctorIndex = SampleDoctors.findIndex(
-      (doctorItem) => doctorItem == tempDoctor
-    );
-    tempDoctor.currentAppointments--;
-    tempDoctor.appointedHours = tempDoctor.appointedHours.filter(
-      (hourItem) =>
-        hourItem !=
-        tempAppointment.hoursTime - tempDoctor.appointmentHours.start
-    );
-    SampleDoctors[tempDoctorIndex] = tempDoctor;
-
-    // update appointment data
-    const tempAppointmentIndex = SampleAppintments.findIndex(
-      (appointmentItem) => appointmentItem == tempAppointment
-    );
-    tempAppointment.status = "deleted";
-    tempAppointment.hoursTime = 0;
-    SampleAppintments[tempAppointmentIndex] = tempAppointment;
-
+  const handleDeleteAppointment = async () => {
+    const { responseData, error } = await deleteAppointmentById(appointmentId);
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!responseData.deleted) {
+      addError(responseData.message);
+      return;
+    }
     // create a notification of deletion of appointment
-    const message =
-      "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+    const message = "appointment deleted";
     sendNotification(
       appointmentDetails.doctorId,
       appointmentDetails.patientId,
-      viewRole,
+      appointmentDetails.doctorName,
       "deletion of appointmet",
       message
     );
-
     navigate(-1);
   };
 
-  const handleApproveAppointment = () => {
-    const tempAppointment = SampleAppintments.find(
-      (appointmentItem) => appointmentItem.id == appointmentId
-    );
-    const tempAppointmentIndex = SampleAppintments.findIndex(
-      (appointmentItem) => appointmentItem == tempAppointment
-    );
-    tempAppointment.status = "scheduled";
-    SampleAppintments[tempAppointmentIndex] = tempAppointment;
+  const handleApproveAppointment = async () => {
+    const { responseData, error } = await approveAppointmentById(appointmentId);
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!responseData.approved) {
+      addError(error);
+      return;
+    }
 
     // create a notification of approval
-    const message =
-      "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+    const message = "The dcotor have approved your appointment";
     sendNotification(
       appointmentDetails.doctorId,
       appointmentDetails.patientId,
-      viewRole,
+      appointmentDetails.doctorName,
       "approval of appointmet",
       message
     );
@@ -137,27 +117,30 @@ export default function AppointmentView({ viewRole = "patient" }) {
     setAppointmentPostDetails(e.target.value);
   };
 
-  const handleSubmitPostAppointmentDetails = (e) => {
+  const handleSubmitPostAppointmentDetails = async (e) => {
     e.preventDefault();
-    const tempAppointment = SampleAppintments.find(
-      (appointmentItem) => appointmentItem.id == appointmentId
+    const { responseData, error } = await addPostDetails(
+      appointmentPostDetails,
+      appointmentId
     );
-    const tempAppointmentIndex = SampleAppintments.findIndex(
-      (appointmentItem) => appointmentItem == tempAppointment
-    );
-    tempAppointment.status = "completed";
-    tempAppointment.details.postDetailsWritten = true;
-    tempAppointment.details.post = appointmentPostDetails;
-    SampleAppintments[tempAppointmentIndex] = tempAppointment;
+
+    if (error) {
+      addError(error);
+      return;
+    }
+
+    if (!responseData.updated) {
+      addError(responseData.message);
+      return;
+    }
 
     // create a notification of appointment post details
-    const message =
-      "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+    const message = "Add post details to appointment: " + appointmentId;
     sendNotification(
       appointmentDetails.doctorId,
       appointmentDetails.patientId,
-      viewRole,
-      "appointment approve",
+      appointmentDetails.doctorName,
+      "post details addded",
       message
     );
 
@@ -260,9 +243,9 @@ export default function AppointmentView({ viewRole = "patient" }) {
                 Post Details:{" "}
               </p>
 
-              {appointmentDetails.details.postDetailsWritten ? (
+              { appointmentDetails.details.postDetailsWritten ? (
                 appointmentDetails.details.post
-              ) : !appointmentTimePassed ? (
+              ) : !appointmentDetails.timePassed ? (
                 appointmentDetails.status == "deleted" ? (
                   <p>
                     Appointment cancelled as time has passed before approving
@@ -298,13 +281,15 @@ export default function AppointmentView({ viewRole = "patient" }) {
           <div className="w-full flex justify-between text-left mt-2 lg:mt-4">
             <Button text={"back"} handleOnClick={handleGoBack} />
             {(viewRole == "doctor" || viewRole == "admin") &&
-              appointmentDetails.status !== "deleted" &&
-              appointmentDetails.status !== "completed" && (
+              appointmentDetails.status != "deleted" &&
+              appointmentDetails.status != "completed" && (
                 <div className="flex space-x-1">
-                  <Button
-                    text={"approve"}
-                    handleOnClick={handleApproveAppointment}
-                  />
+                  {appointmentDetails.status != "scheduled" && (
+                    <Button
+                      text={"approve"}
+                      handleOnClick={handleApproveAppointment}
+                    />
+                  )}
                   <Button
                     text={"delete"}
                     variant="danger"

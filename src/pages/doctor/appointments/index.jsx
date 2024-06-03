@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import AppointmentTable from "../../../Components/appointmentsTable";
-import { SampleAppintments } from "../../../sampleData/sampleAppointments";
-import { SampleDoctors } from "../../../sampleData/sampleDoctors";
 import Loader from "../../../Components/loader";
+import getAllAppointments from "../../../services/appointment/getAll";
+import useErrorContext from "../../../context/errorContext";
 
 const itemsToShowAtATime = 5;
 
-const sampleDoctor = SampleDoctors[0];
 export default function Appointments() {
-  const [doctor, setDoctor] = useState({});
   const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [itemsRange, setItemsRange] = useState({
@@ -17,33 +15,33 @@ export default function Appointments() {
   });
   const [totalItems, setTotalItems] = useState(0);
 
-  const makeDoctorDataRequest = () => {
-    setTimeout(() => {
-      setDoctor(sampleDoctor);
-    }, 500);
-  };
+  const {addError} = useErrorContext()
 
-  const makeAppointmentsDataRequest = () => {
+  const makeAppointmentsDataRequest = async() => {
     setIsLoading(true);
-    setTimeout(() => {
-      const tempAppointments = SampleAppintments.filter(
-        (appointmentItem) => appointmentItem.doctorId == doctor.id
-      );
-      setAppointments(
-        tempAppointments.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempAppointments.length); // for now
+    const { reponseData, error } = await getAllAppointments(
+      itemsToShowAtATime,
+      itemsRange.start
+    );
+    if (error) {
+      addError(error);
       setIsLoading(false);
-    }, 500);
-  };
+      return;
+    }
+    if (!reponseData.data) {
+      addError(reponseData.message);
+      setIsLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    makeDoctorDataRequest();
-  }, []);
+    setTotalItems(reponseData.count);
+    setAppointments(reponseData.data);
+    setIsLoading(false)
+  };
 
   useEffect(() => {
     makeAppointmentsDataRequest();
-  }, [doctor]);
+  }, [itemsRange]);
 
   return (
     <section className="w-full flex flex-col ">

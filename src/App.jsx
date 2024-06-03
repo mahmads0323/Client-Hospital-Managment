@@ -10,8 +10,10 @@ import Doctor from "./pages/doctor";
 import Admin from "./pages/admin";
 import ProtectedRoute from "./Components/protectedRoute";
 import ErrorNotifications from "./Components/errorNotidication";
+import ResetPassword from "./pages/reset-password";
 
 function App() {
+
   return (
     <>
       <ErrorNotifications />
@@ -19,8 +21,9 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/get-started">
           <Route path="" element={<GetStartedPage />} />
-          <Route path="login" element={<LoginPage />} />
           <Route path="signup" element={<Signup />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="reset" element={<ResetPassword />} />
         </Route>
 
         {/* for child routing */}

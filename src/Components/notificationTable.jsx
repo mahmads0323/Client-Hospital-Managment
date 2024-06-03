@@ -116,7 +116,7 @@ export default function NotificationTable({
                       text={notificationViewed ? "view" : "new"}
                       variant={notificationViewed ? "secondry" : "primary"}
                       handleOnClick={() =>
-                        handleNotificationView(notification.id)
+                        handleNotificationView(notification._id)
                       }
                     />
                   </td>

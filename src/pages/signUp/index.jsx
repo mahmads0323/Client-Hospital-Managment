@@ -3,10 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import PatientSignUp from "./patientSignup";
 import DoctorSignUp from "./doctorSignup";
 import AdminSignUp from "./adminSignup";
+import useUserContext from "../../context/userContext";
 
 const Signup = () => {
   const naviagte = useNavigate();
   const [role, setRole] = useState("");
+
+  const { currentRole } = useUserContext();
 
   // getting user state from location state
   // no location state is set if we visit url directly
@@ -14,6 +17,14 @@ const Signup = () => {
 
   // validating the presence of any role
   useEffect(() => {
+
+    // check if user is logged in or not
+    if (currentRole) {
+      naviagte(`/${currentRole}`);
+      return;
+    }
+
+    // 
     if (locationState && locationState.userRole) {
       setRole(locationState.userRole);
     } else {

@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import FormInput from "../../Components/formInput";
 import Button from "../../Components/button";
+import { Link, useNavigate } from "react-router-dom";
+import login from "../../services/login";
+import useErrorContext from "../../context/errorContext";
+import useUserContext from "../../context/userContext";
 
 const initialDetails = {
   email: "",
@@ -9,12 +13,33 @@ const initialDetails = {
 
 export default function LoginPage() {
   const [loginDetails, setLoginDetails] = useState(initialDetails);
+  const { addError } = useErrorContext();
+  const { handleSetCookie } = useUserContext();
+  const navigate = useNavigate();
+  const {currentRole} = useUserContext()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login Details: ", loginDetails);
-    setLoginDetails(initialDetails);
+    const { responseData, error } = await login(loginDetails);
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!responseData.token) {
+      addError(responseData.message);
+      return;
+    }
+    await handleSetCookie(responseData.token);
+    navigate(`/${responseData.role}`);
   };
+
+  useEffect(()=>{
+       // check if user is logged in or not
+       if (currentRole) {
+        navigate(`/${currentRole}`);
+        return;
+      }
+  }, [])
 
   return (
     <main className=" flex items-center justify-center min-h-screen bg-primary">
@@ -59,18 +84,21 @@ export default function LoginPage() {
           <div className="  flex flex-col justify-center gap-1 text-xs text-textColor ">
             <p>
               Forgot password?{" "}
-              <a href="#" className="font-semibold underline hover:scale-95">
+              <Link
+                to={"/get-started/reset"}
+                className="font-semibold underline hover:scale-95"
+              >
                 Reset
-              </a>
+              </Link>
             </p>
             <p>
               Do not have an account?{" "}
-              <a
-                href="/get-started"
+              <Link
+                to={"/get-started"}
                 className="font-semibold underline hover:scale-95"
               >
                 Signup
-              </a>
+              </Link>
             </p>
           </div>
 

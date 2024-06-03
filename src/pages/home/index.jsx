@@ -1,14 +1,22 @@
-import { useNavigate } from "react-router";
-import Button from "../../Components/button";
-import LOGO from "/logo.jpg"
+import LOGO from "/logo.jpg";
+import CustomLink from "../../Components/link";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import useUserContext from "../../context/userContext";
 
 export default function HomePage() {
 
-    const naviagte = useNavigate();
+  const naviagte = useNavigate();
+  const {currentRole} = useUserContext()
 
-    const naviagteToGetStarted = ()=>{
-        naviagte("/get-started")
-    }
+  useEffect(()=>{
+       // check if user is logged in or not
+       if (currentRole) {
+        naviagte(`/${currentRole}`);
+        return;
+      }
+  }, [])
+
   return (
     <main className="h-[100vh]  bg-primary flex ">
       <div className="relative flex-[50%]">
@@ -18,13 +26,14 @@ export default function HomePage() {
             Hospital Mangement system{" "}
           </h3>
         </div>
-        <div className="absolute w-full flex justify-center bottom-[40%] animate-slideUpAndFadeOut">
-          <Button text="Get started" handleOnClick={naviagteToGetStarted} />
+        <div className="absolute w-full flex space-x-2 justify-center bottom-[40%] animate-slideUpAndFadeOut">
+          <CustomLink to="/get-started" text={"Signup"} />
+          <CustomLink to="/get-started/login" text={"Login"} />
         </div>
       </div>
 
       <div className="hidden md:block md:flex-[50%] nd:h-full">
-        <img src={LOGO} alt="logo" className="h-full w-full"/>
+        <img src={LOGO} alt="logo" className="h-full w-full" />
       </div>
     </main>
   );

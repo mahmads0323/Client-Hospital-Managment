@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "./button";
 import Loader from "./loader";
-import { SampleNotifications } from "../sampleData/sampleNotification";
 import NotFoundPage from "../pages/not-found";
+import getNotificationById from "../services/notification/getById";
+import useErrorContext from "../context/errorContext";
 
 export default function NotificationView({ viewRole = "patient" }) {
   const params = useParams();
@@ -14,35 +15,26 @@ export default function NotificationView({ viewRole = "patient" }) {
   const [notificationFound, setNotificationFound] = useState(true);
 
   const navigate = useNavigate();
+  const { addError } = useErrorContext();
 
-  const makeDataRequest = () => {
-    setTimeout(() => {
-      const temp = SampleNotifications.find((e) => e.id == notificationId);
-      if (!temp) {
-        setIsLoading(false);
-        setNotificationFound(false);
-      }
-      //   console.log("temp: ", temp);
-      const tempIndex = SampleNotifications.findIndex((e) => e.id == temp.id);
-      switch (viewRole) {
-        case "patient":
-          temp.viewedBy.patient = true;
-          break;
-        case "doctor":
-          temp.viewedBy.doctor = true;
-          break;
-        case "admin":
-          temp.viewedBy.admin = true;
-          break;
-        default:
-          break;
-      }
-
-      SampleNotifications[tempIndex] = temp;
-      setNotificationDetails(temp);
+  const makeDataRequest = async () => {
+    setIsLoading(false);
+    const { responseData, error } = await getNotificationById(notificationId);
+    if (error) {
+      addError(error);
       setIsLoading(false);
-      setNotificationFound(true);
-    }, 1000);
+      setNotificationFound(false);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setIsLoading(false);
+      setNotificationFound(false);
+      return;
+    }
+    setNotificationDetails(responseData.data);
+    setIsLoading(false);
+    setNotificationFound(true);
   };
 
   const handleGoBack = () => {
@@ -107,7 +99,7 @@ export default function NotificationView({ viewRole = "patient" }) {
               {notificationDetails.message}
             </p>
             <p className="text-sm w-full text-right">
-              Regards:{" "}
+              Regards: {notificationDetails.fromName}
               <span className="font-medium">{notificationDetails.from}</span>
             </p>
           </div>

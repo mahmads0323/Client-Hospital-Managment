@@ -1,49 +1,45 @@
 import { useEffect, useState } from "react";
 import PatientsTable from "../../../Components/patientsTable";
-import { SamplePatients } from "../../../sampleData/samplePatients";
-import { SampleAdmins } from "../../../sampleData/sampleAdmins";
 import Loader from "../../../Components/loader";
+import getAllPatients from "../../../services/patient/getAll";
+import useErrorContext from "../../../context/errorContext";
 
 const itemsToShowAtATime = 5;
-const sampleAdmin = SampleAdmins[0];
 
 export default function Patients() {
-  const [admin, setAdmin] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
-
   const [patients, setPatients] = useState([]);
-  const [pateintsLoading, setPatientsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [itemsRange, setItemsRange] = useState({
     start: 0,
     end: itemsToShowAtATime - 1,
   });
   const [totalItems, setTotalItems] = useState(0);
+  const { addError } = useErrorContext();
 
-  const makeDoctorDataRequest = () => {
+  const makePateintsDataRequest = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setAdmin(sampleAdmin);
+    const { responseData, error } = await getAllPatients(
+      itemsToShowAtATime,
+      itemsRange.start
+    );
+    if (error) {
+      addError(error);
       setIsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setIsLoading(false);
+      return;
+    }
+    setPatients(responseData.data);
+    setTotalItems(responseData.count);
+    setIsLoading(false);
   };
-
-  const makePateintsDataRequest = () => {
-    setPatientsLoading(true);
-    setTimeout(() => {
-      const tempPatients = SamplePatients;
-      setPatients(tempPatients.slice(itemsRange.start, itemsRange.end + 1));
-      setTotalItems(tempPatients.length); // for now
-      setPatientsLoading(false);
-    }, 500);
-  };
-
-  useEffect(() => {
-    makeDoctorDataRequest();
-  }, []);
 
   useEffect(() => {
     makePateintsDataRequest();
-  }, [admin, itemsRange]);
+  }, [itemsRange]);
 
   return (
     <section className="w-full flex flex-col ">
@@ -55,7 +51,7 @@ export default function Patients() {
             Patients(s)
           </p>
 
-          {pateintsLoading ? (
+          {isLoading ? (
             <Loader />
           ) : (
             <div className="px-2 ">

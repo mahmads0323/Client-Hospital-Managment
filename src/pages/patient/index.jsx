@@ -42,7 +42,7 @@ export default function Patient() {
 
             <Route path="/appointments">
               <Route path="" element={<Appointments />} />
-              <Route path="new" element={<NewAppointment />} />
+              <Route path="new" element={<NewAppointment viewRole="patient" />} />
               <Route
                 path=":appointmentId"
                 element={<AppointmentView viewRole="patient" />}

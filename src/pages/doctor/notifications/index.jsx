@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import Loader from "../../../Components/loader";
 import NotificationTable from "../../../Components/notificationTable";
-import { SampleDoctors } from "../../../sampleData/sampleDoctors";
-import { SampleNotifications } from "../../../sampleData/sampleNotification";
+import getAllNotification from "../../../services/notification/getAllNotification";
+import useErrorContext from "../../../context/errorContext";
 
-const sampleDoctor = SampleDoctors[0];
 const itemsToShowAtATime = 5;
 
 export default function DoctorNotifications() {
-  const [doctor, setDoctor] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [itemsRange, setItemsRange] = useState({
@@ -17,34 +15,32 @@ export default function DoctorNotifications() {
   });
   const [totalItems, setTotalItems] = useState(0);
 
-  const makePatientDataRequest = () => {
-    setTimeout(() => {
-        setDoctor(sampleDoctor);
-    }, 500);
-  };
+  const { addError } = useErrorContext();
 
-  const makePateintNotificationRequest = () => {
+  const makePateintNotificationRequest = async () => {
     setIsLoading(true);
-  console.log("Hello : ", doctor.id)
-    setTimeout(() => {
-      const tempNotifications = SampleNotifications.filter(
-        (notificationItem) => notificationItem.toId == doctor.id
-      );
-      setNotifications(
-        tempNotifications.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempNotifications.length); // for now
+    const { repsonseData, error } = await getAllNotification(
+      itemsToShowAtATime,
+      itemsRange.start
+    );
+    if (error) {
+      addError(error);
       setIsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!repsonseData.data) {
+      addError(repsonseData.message);
+      setIsLoading(false);
+      return;
+    }
+    setTotalItems(repsonseData.count);
+    setNotifications(repsonseData.data);
+    setIsLoading(false);
   };
-
-  useEffect(() => {
-    makePatientDataRequest();
-  }, []);
 
   useEffect(() => {
     makePateintNotificationRequest();
-  }, [doctor, itemsRange]);
+  }, [itemsRange]);
 
   return (
     <section className="w-full flex flex-col ">

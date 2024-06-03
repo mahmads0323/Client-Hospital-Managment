@@ -12,7 +12,6 @@ export default function AppointmentTable({
   const navigate = useNavigate();
 
   const handleAppointmentView = (appointmentId) => {
-    console.log("view role: ", viewRole);
     switch (viewRole) {
       case "doctor":
         navigate(`/doctor/appointments/${appointmentId}`);
@@ -86,7 +85,7 @@ export default function AppointmentTable({
               <tr
                 key={index}
                 className="text-gray-700 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleAppointmentView(appointment.id)}
+                onClick={() => handleAppointmentView(appointment._id)}
               >
                 <td className="px-2 py-1 md:px-4 md:py-2">
                   {itemsRange.start + index + 1}

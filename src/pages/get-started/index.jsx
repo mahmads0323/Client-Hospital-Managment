@@ -1,4 +1,3 @@
-import ADMIN_LOGO from "/logo.jpg";
 import DOCTOR_LOGO from "/doctor_uniform.jpg";
 import PATIENT_LOGO from "/patient_leaving.jpeg";
 import RoleCards from "./roleCards";
@@ -11,10 +10,6 @@ const roleCardDetails = [
   {
     imageSource: DOCTOR_LOGO,
     roleText: "doctor",
-  },
-  {
-    imageSource: ADMIN_LOGO,
-    roleText: "admin",
   },
 ];
 
