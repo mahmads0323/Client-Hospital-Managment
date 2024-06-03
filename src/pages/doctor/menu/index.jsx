@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import MenuItem from "../../../Components/menuItem";
-
+import Button from "../../../Components/button";
+import useUserContext from "../../../context/userContext";
 
 const doctorMenuDetails = [
   {
@@ -23,6 +24,8 @@ const doctorMenuDetails = [
 ];
 
 export default function DoctorMenu() {
+  const { handleLogout } = useUserContext();
+
   return (
     <menu className="bg-secondary h-full text-textColor flex justify-between px-2 sm:px-4 md:px-8 lg:px-0 lg:flex-col lg:items-center">
       <Link
@@ -44,6 +47,8 @@ export default function DoctorMenu() {
             key={index}
           />
         ))}
+
+        <Button text={"Logout"} handleOnClick={handleLogout} variant="danger" />
       </div>
     </menu>
   );

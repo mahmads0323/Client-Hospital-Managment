@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { SamplePatients } from "../../../sampleData/samplePatients";
 import Loader from "../../../Components/loader";
-import { SampleAppintments } from "../../../sampleData/sampleAppointments";
 import AppointmentTable from "../../../Components/appointmentsTable";
 import CustomLink from "../../../Components/link";
+import getByCookie from "../../../services/patient/getByCookie";
+import useErrorContext from "../../../context/errorContext";
+import getByStatus from "../../../services/appointment/getByStatus";
 
 const itemsToShowAtATime = 5;
-const samplePatient = SamplePatients[0];
 
 export default function Home() {
   const [patient, setPatient] = useState({});
@@ -20,28 +20,45 @@ export default function Home() {
   });
   const [totalItems, setTotalItems] = useState(0);
 
-  const makePatientDataRequest = () => {
+  const { addError } = useErrorContext();
+
+  const makePatientDataRequest = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setPatient(samplePatient);
+    const { reponseData, error } = await getByCookie();
+    if (error) {
+      addError(error);
       setIsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!reponseData.data) {
+      addError(reponseData.message);
+      setIsLoading(false);
+      return;
+    }
+    setPatient(reponseData.data);
+    setIsLoading(false);
   };
 
   const makeScheduledAppointmentsRequest = async () => {
     setScheduledAppointmentsLoading(true);
-    setTimeout(() => {
-      const tempAppointments = SampleAppintments.filter(
-        (appointmentItem) =>
-          appointmentItem.status == "scheduled" &&
-          appointmentItem.patientId == patient.id
-      );
-      setScheduledAppointmnts(
-        tempAppointments.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempAppointments.length); // for now
+    const { reponseData, error } = await getByStatus(
+      "scheduled",
+      itemsToShowAtATime,
+      itemsRange.start
+    );
+    if (error) {
+      addError(error);
       setScheduledAppointmentsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!reponseData.data) {
+      addError(reponseData.message);
+      setScheduledAppointmentsLoading(false);
+      return;
+    }
+    setTotalItems(reponseData.count);
+    setScheduledAppointmnts(reponseData.data);
+    setScheduledAppointmentsLoading(false);
   };
 
   useEffect(() => {

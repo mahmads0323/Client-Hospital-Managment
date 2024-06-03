@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import { SampleDoctors } from "../../../sampleData/sampleDoctors";
 import PatientsTable from "../../../Components/patientsTable";
-import { SamplePatients } from "../../../sampleData/samplePatients";
+import Loader from "../../../Components/loader";
+import getAllPatients from "../../../services/patient/getAll";
+import useErrorContext from "../../../context/errorContext";
 
 const itemsToShowAtATime = 5;
-const sampleDoctor = SampleDoctors[0];
 
 export default function MyPatients() {
-  const [doctor, setDoctor] = useState({});
   const [patients, setPatients] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [itemsRange, setItemsRange] = useState({
@@ -16,33 +15,32 @@ export default function MyPatients() {
   });
   const [totalItems, setTotalItems] = useState(0);
 
-  const makeDoctorDataRequest = () => {
-    setTimeout(() => {
-      setDoctor(sampleDoctor);
-    }, 500);
-  };
+  const { addError } = useErrorContext();
 
-  const makePateintsDataRequest = () => {
+  const makePateintsDataRequest = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      const tempPatients = SamplePatients.filter(
-        (patientItem) => patientItem.doctorIds.includes(doctor.id)
-      );
-      setPatients(
-        tempPatients.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempPatients.length); // for now
+    const { responseData, error } = await getAllPatients(
+      itemsToShowAtATime,
+      itemsRange.start
+    );
+    if (error) {
+      addError(error);
       setIsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setIsLoading(false);
+      return;
+    }
+    setPatients(responseData.data);
+    setTotalItems(responseData.count);
+    setIsLoading(false);
   };
-
-  useEffect(() => {
-    makeDoctorDataRequest();
-  }, []);
 
   useEffect(() => {
     makePateintsDataRequest();
-  }, [doctor, itemsRange]);
+  }, [itemsRange]);
 
   return (
     <section className="w-full flex flex-col ">
@@ -50,16 +48,20 @@ export default function MyPatients() {
         Patients(s)
       </p>
 
-      <div className="px-2 ">
-        <PatientsTable
-          patients={patients}
-          itemsToShowAtATime={itemsToShowAtATime}
-          totalItems={totalItems}
-          itemsRange={itemsRange}
-          viewRole="doctor"
-          setItemsRange={setItemsRange}
-        />
-      </div>
+      {isLoading ? (
+        <Loader />
+      ) : (
+        <div className="px-2 ">
+          <PatientsTable
+            patients={patients}
+            itemsToShowAtATime={itemsToShowAtATime}
+            totalItems={totalItems}
+            itemsRange={itemsRange}
+            viewRole="doctor"
+            setItemsRange={setItemsRange}
+          />
+        </div>
+      )}
     </section>
   );
 }

@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { SamplePatients } from "../../sampleData/samplePatients";
 import Loader from "../../Components/loader";
 import FormInput from "../../Components/formInput";
-import { SampleDoctors } from "../../sampleData/sampleDoctors";
-import { SampleAppintments } from "../../sampleData/sampleAppointments";
 import Button from "../../Components/button";
 import { useNavigate } from "react-router-dom";
-import { sendNotification } from "../../Components/utils/sendNotification";
-
-const sampleUser = SamplePatients[0];
+import getByCookie from "../../services/patient/getByCookie";
+import useErrorContext from "../../context/errorContext";
+import getAllDcotors from "../../services/doctor/getAllDoctors";
+import dailyDoctorSchedule from "../../services/doctor/dailySchedule";
+import createAppointment from "../../services/appointment/create";
+import createNotification from "../../services/notification/createNotification";
 
 const todayDate = new Date().setUTCHours(0, 0, 0, 0);
 const minDate = new Date(todayDate + 1 * 24 * 60 * 60 * 1000)
@@ -18,104 +18,124 @@ const maxDate = new Date(todayDate + 7 * 24 * 60 * 60 * 1000)
   .toISOString()
   .slice(0, 10); // 7 days from tomorrow
 
+const initialAppointmentDetails = {
+  doctorId: 0,
+  doctorName: "",
+  doctorField: "",
+  patientName: "",
+  patientCnic: 0,
+  dated: 0,
+  hoursTime: 0,
+  status: "pending",
+  pre: "",
+};
+
 export default function NewAppointment({ viewRole = "patient" }) {
-  const [userDetails, setUserDetails] = useState({});
-  const [newAppointmentDetails, setNewAppointmentDetails] = useState({
-    doctorId: 0,
-    patientId: 0,
-    doctorName: "",
-    doctorField: "",
-    patientName: "",
-    dated: 0,
-    hoursTime: 0,
-    status: "pending",
-    details: {
-      pre: "",
-      post: "",
-    },
-  });
+  const [newAppointmentDetails, setNewAppointmentDetails] = useState(
+    initialAppointmentDetails
+  );
   const [isLaoding, setIsLaoding] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [doctorFields, setDoctorFields] = useState([]);
   const [allDoctorsNameAndId, setAllDoctorsNameAndId] = useState([]);
+  const [selectedDoctorsNameAndId, setSelectedDoctorsNameAndId] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState({});
+
   const [selectedDateSchedule, setSelectedDateSchedule] = useState({});
+  const [isScheduleLoading, setIsScheduleLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const makeDataRequest = () => {
+  const { addError } = useErrorContext();
+
+  const makeDataRequest = async () => {
     setIsLaoding(true);
-    setTimeout(() => {
-      // base on view rol
-      // if view role is admin, then admin must provide patient name and id
-      // if view role is patiet, get pateint data from token
-      if (viewRole == "patient") {
-        //
-        setUserDetails(sampleUser);
-        setNewAppointmentDetails((prev) => ({
-          ...prev,
-          patientName: sampleUser.name,
-          patientId: sampleUser.id,
-        }));
+
+    // base on view rol
+    // if view role is admin, then admin must provide patient name and id
+    // if view role is patiet, get pateint data from token
+    if (viewRole == "patient") {
+      //
+      const { reponseData, error } = await getByCookie();
+      if (error) {
+        addError(error);
+        setIsLaoding(false);
+        return;
       }
-
+      if (!reponseData.data) {
+        addError(reponseData.message);
+        setIsLaoding(false);
+        return;
+      }
+      setNewAppointmentDetails((prev) => ({
+        ...prev,
+        patientName: reponseData.data.name,
+        patientCnic: reponseData.data.cnic,
+      }));
       setIsLaoding(false);
-    }, 1000);
+    } else if (viewRole == "admin") {
+      setNewAppointmentDetails((prev) => ({
+        ...prev,
+        patientName: "",
+        patientCnic: 0,
+      }));
+      setIsLaoding(false);
+    }
   };
 
-  const makeDoctorFieldsRequest = () => {
-    const tempFields = SampleDoctors.map((doctor) => doctor.field);
+  const makeDoctorFieldsRequest = async () => {
+    const { repsonseData, error } = await getAllDcotors(-1, 0); // specail condition to get all doctors
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!repsonseData.data) {
+      addError(repsonseData.message);
+      return;
+    }
+    const tempFields = repsonseData.data.map((doctor) => doctor.field);
     setDoctorFields(tempFields);
+    setAllDoctorsNameAndId(repsonseData.data);
   };
 
-  const makeAllDoctorsNameAndIdRequest = (fieldName) => {
+  const handleSetSelectedDoctorNameAndId = (fieldName) => {
     // it will be called when field is selected
-    const tempDoctors = SampleDoctors.filter(
+    const tempDoctors = allDoctorsNameAndId.filter(
       (doctorItem) => doctorItem.field == fieldName
     );
-    const tempDoctorNameAndId = tempDoctors.map((doctorItem) => ({
-      name: doctorItem.name,
-      id: doctorItem.id,
-    }));
-    setAllDoctorsNameAndId(tempDoctorNameAndId);
+    setSelectedDoctorsNameAndId(tempDoctors);
   };
 
   const makeDoctorDataRequest = (doctorId) => {
     // it will be called when doctor name is changed
-    const doctor = SampleDoctors.find(
+    const doctor = selectedDoctorsNameAndId.find(
       (doctorItem) => doctorItem.id == doctorId
     );
+    setNewAppointmentDetails((prev) => ({
+      ...prev,
+      doctorName: doctor.name,
+      doctorId: doctor.id,
+    }));
     setSelectedDoctor(doctor);
   };
 
-  const makeselectedDateScheduleDataRequest = (selectedDate) => {
-    let tempSchedule = selectedDoctor.schedule.find(
-      (scheduleItem) =>
-        scheduleItem.day.start > selectedDate &&
-        scheduleItem.day.end <= selectedDate
+  const makeselectedDateScheduleDataRequest = async (selectedDate) => {
+    setIsScheduleLoading(true);
+    const { responseData, error } = await dailyDoctorSchedule(
+      selectedDoctor.id,
+      selectedDate
     );
-    if (!tempSchedule) {
-      const tempDoctorIndex = SampleDoctors.findIndex(
-        (doctorItem) => doctorItem.id == selectedDoctor.id
-      );
-
-      const tempStartDate = new Date().setUTCHours(0, 0, 0, 0);
-      const tempEndDate = tempStartDate + 1 * 24 * 60 * 60 * 1000; // 1 day ahead
-      // create new schdule
-      tempSchedule = {
-        day: {
-          start: tempStartDate,
-          end: tempEndDate,
-        },
-        currentAppointments: 0,
-        appointedHours: [],
-      };
-      selectedDoctor.schedule.push(tempSchedule);
-      SampleDoctors[tempDoctorIndex] = selectedDoctor;
+    if (error) {
+      addError(error);
+      return;
     }
-    console.log("selected doctor: ", selectedDoctor);
-    console.log("tempSchedule: ", tempSchedule);
-    setSelectedDateSchedule(tempSchedule);
+    if (!responseData.data) {
+      addError(responseData.message);
+      return;
+    }
+    setSelectedDateSchedule(responseData.data);
+    setIsScheduleLoading(false);
   };
 
   useEffect(() => {
@@ -130,10 +150,10 @@ export default function NewAppointment({ viewRole = "patient" }) {
     }));
   };
 
-  const handlePateintIdChange = (e) => {
+  const handlePatientCnicChange = (e) => {
     setNewAppointmentDetails((prev) => ({
       ...prev,
-      patientId: e.target.value,
+      patientCnic: e.target.value,
     }));
   };
 
@@ -143,20 +163,18 @@ export default function NewAppointment({ viewRole = "patient" }) {
       ...prev,
       doctorField: fieldName,
     }));
-    makeAllDoctorsNameAndIdRequest(fieldName);
+    handleSetSelectedDoctorNameAndId(fieldName);
   };
 
   const handleDoctorChange = (e) => {
     const doctorId = e.target.value;
-    const doctorNameAndId = allDoctorsNameAndId.find(
-      (doctorItem) => doctorItem.id == doctorId
-    );
-    setNewAppointmentDetails((prev) => ({
-      ...prev,
-      doctorName: doctorNameAndId.name,
-      doctorId: doctorId,
-    }));
     makeDoctorDataRequest(doctorId);
+  };
+
+  const handleAppointmentDateChange = (e) => {
+    const tempDate = new Date(e.target.value).getTime();
+    setNewAppointmentDetails((prev) => ({ ...prev, dated: tempDate }));
+    makeselectedDateScheduleDataRequest(tempDate);
   };
 
   const handleAppointmentTime = (e) => {
@@ -164,69 +182,65 @@ export default function NewAppointment({ viewRole = "patient" }) {
     setNewAppointmentDetails((prev) => ({
       ...prev,
       hoursTime: choosenHour,
-      dated: Date.now(),
     }));
-    // update doctor time table
-    const tempAppointedHours = [...selectedDoctor.appointedHours]; // make a copy
-    tempAppointedHours.push(
-      choosenHour - selectedDoctor.appointmentHours.start
-    );
-    // const tempData = {...selectedDoctor};
-    // tempData.currentAppointments++;
-    // tempData.appointedHours.push(choosenHour - tempData.appointmentHours.start);
   };
 
   const handlePreMessageChange = (e) => {
     setNewAppointmentDetails((prev) => ({
       ...prev,
-      details: {
-        pre: e.target.value,
-        post: prev.details.post,
-      },
+      pre: e.target.value,
     }));
   };
 
-  const handleAppointmentDateChange = (e) => {
-    const tempDate = new Date(e.target.value).getTime();
-    console.log("date: ", tempDate);
-    makeselectedDateScheduleDataRequest(tempDate);
-    setNewAppointmentDetails((prev) => ({ ...prev, dated: tempDate }));
+  const sendNotification = async (fromId, toId, fromName, title, message) => {
+    const { responseData, error } = await createNotification({
+      fromId,
+      toId,
+      fromName,
+      title,
+      message,
+    });
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!responseData.added) {
+      addError(responseData.message);
+      return;
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    // update doctor time table
-    const tempDoctor = SampleDoctors.find(
-      (doctorItem) => doctorItem.id == newAppointmentDetails.doctorId
+    const { responseData, error } = await createAppointment(
+      newAppointmentDetails
     );
+    if (error) {
+      addError(error);
+      setIsSubmitting(false);
+      return;
+    }
+    if (!responseData.added) {
+      addError(responseData.message);
+      setIsSubmitting(false);
+      return;
+    }
+    setIsSubmitting(false);
+    console.log("response data: ", responseData);
+    setNewAppointmentDetails(initialAppointmentDetails);
 
-    const scheduleToUpdate = tempDoctor.schedule.find(
-      (schduleItem) =>
-        schduleItem.day.start > newAppointmentDetails.dated &&
-        schduleItem.day.end <= newAppointmentDetails.dated
-    );
-
-    const doctorIndex = SampleDoctors.findIndex(
-      (doctorItem) => doctorItem.id == selectedDoctor.id
-    );
-    SampleDoctors[doctorIndex] = tempDoctor;
-
-    // update user appointments table
-    SampleAppintments.unshift({
-      id: SampleAppintments.length,
-      ...newAppointmentDetails,
-    });
-
-    // update user notification
-    console.log("doctor id: ", newAppointmentDetails.doctorId);
+    // send user notification
     const message =
       "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
-    sendNotification(
-      userDetails.id,
+
+    await sendNotification(
+      1, // admin by default
       newAppointmentDetails.doctorId,
-      userDetails.name,
-      "new appointment",
+      newAppointmentDetails.doctorName,
+      "New Appointment with patient having cnic: " +
+        newAppointmentDetails.patientCnic,
       message
     );
 
@@ -268,28 +282,28 @@ export default function NewAppointment({ viewRole = "patient" }) {
               className="flex flex-col space-y-2 md:space-y-3"
             >
               <label>
-                <p className="text-sm text-textColor">Name</p>
+                <p className="text-sm text-textColor">Patient name</p>
                 <FormInput
                   id="name"
                   name="name"
                   type="text"
                   required={true}
-                  placeholder="Name"
+                  placeholder="Patient name"
                   value={newAppointmentDetails.patientName}
                   handleChange={handlePateintNameChange}
                 />
               </label>
 
               <label>
-                <p className="text-sm text-textColor">Patient Id</p>
+                <p className="text-sm text-textColor">Patient CNIC</p>
                 <FormInput
                   id="patient-id"
                   name="patient-id"
                   type="text"
                   required={true}
                   placeholder="Patient Id"
-                  value={newAppointmentDetails.patientId}
-                  handleChange={handlePateintIdChange}
+                  value={newAppointmentDetails.patientCnic}
+                  handleChange={handlePatientCnicChange}
                 />
               </label>
 
@@ -320,7 +334,7 @@ export default function NewAppointment({ viewRole = "patient" }) {
                     className="w-full bg-white  text-textColor my-1 p-1 border-designColor2 border rounded focus:outline-none focus:border-textColor"
                   >
                     <option value="">none selected</option>
-                    {allDoctorsNameAndId.map((field, index) => (
+                    {selectedDoctorsNameAndId.map((field, index) => (
                       <option key={index} value={field.id}>
                         {field.name}
                       </option>
@@ -351,6 +365,8 @@ export default function NewAppointment({ viewRole = "patient" }) {
                 <p className="text-sm text-textColor">Time </p>
                 {newAppointmentDetails.dated == 0 ? (
                   "Please select a Date first"
+                ) : isScheduleLoading ? (
+                  "schedule Loading..."
                 ) : (
                   <select
                     onChange={handleAppointmentTime}
@@ -362,7 +378,7 @@ export default function NewAppointment({ viewRole = "patient" }) {
                       (_, index) => (
                         <option
                           key={index}
-                          value={selectedDateSchedule.day.start + index}
+                          value={selectedDoctor.appointmentHours.start + index}
                           disabled={selectedDateSchedule.appointedHours.includes(
                             index
                           )}
@@ -372,11 +388,15 @@ export default function NewAppointment({ viewRole = "patient" }) {
                               : "text-textColor "
                           }`}
                         >
-                          {selectedDateSchedule.day.start + index > 12
+                          {selectedDoctor.appointmentHours.start + index > 12
                             ? `${
-                                (selectedDateSchedule.day.start + index) % 12
+                                (selectedDoctor.appointmentHours.start +
+                                  index) %
+                                12
                               } P.M`
-                            : `${selectedDateSchedule.day.start + index} A.M`}
+                            : `${
+                                selectedDoctor.appointmentHours.start + index
+                              } A.M`}
                           {" - "}
                           {selectedDateSchedule.appointedHours.includes(index)
                             ? "Booked"
@@ -390,7 +410,7 @@ export default function NewAppointment({ viewRole = "patient" }) {
 
               <label htmlFor="pre-details">
                 <p className="text-sm text-textColor">
-                  Discuss Details (optional)
+                  Discuss Details 
                 </p>
                 <textarea
                   className="w-full bg-white  text-textColor my-1 p-1 border-designColor2 border rounded focus:outline-none focus:border-textColor"
@@ -398,12 +418,16 @@ export default function NewAppointment({ viewRole = "patient" }) {
                   name="pre-details"
                   type="text"
                   placeholder="Name"
-                  value={newAppointmentDetails.details.pre}
+                  value={newAppointmentDetails.pre}
                   onChange={handlePreMessageChange}
                 />
               </label>
 
-              <Button type="submit" text={"submit for approval"} />
+              <Button
+                type="submit"
+                text={"submit for approval"}
+                disabled={isSubmitting}
+              />
             </form>
           </div>
         )}

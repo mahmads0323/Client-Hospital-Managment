@@ -4,7 +4,11 @@ import Button from "../../Components/button";
 import FormSelecetInput from "../../Components/formSelectInput";
 import useErrorContext from "../../context/errorContext";
 import Loader from "../../Components/loader";
-import { SampleDoctors } from "../../sampleData/sampleDoctors";
+import { Link, useNavigate } from "react-router-dom";
+import addDoctor from "../../services/doctor/addDoctor";
+import useUserContext from "../../context/userContext";
+import getDoctorUsingCookie from "../../services/doctor/getDoctorUsingCookie";
+import editDoctor from "../../services/doctor/editDoctor";
 
 const initialDoctorDetails = {
   name: "",
@@ -30,7 +34,10 @@ export default function DoctorSignUp({ formMode = "signup" }) {
   const [doctorDetails, setDoctorDetails] = useState({});
   const [isLoading, setIsLaoding] = useState(true);
   const [isSendingDetails, setIsSendingDetails] = useState(false);
-  const { addError } = useErrorContext();
+
+  const navigate = useNavigate();
+  const { addError, addSuccess } = useErrorContext();
+  const { handleSetCookie } = useUserContext();
 
   const handleNameChange = (e) => {
     setDoctorDetails((prev) => ({ ...prev, name: e.target.value }));
@@ -101,7 +108,7 @@ export default function DoctorSignUp({ formMode = "signup" }) {
     }));
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
 
     // validate name length
@@ -200,31 +207,70 @@ export default function DoctorSignUp({ formMode = "signup" }) {
     }
 
     setIsSendingDetails(true);
-    console.log("Docotr details: ", doctorDetails);
-
     // base on formMode use different apis
-    setTimeout(() => {
-      // setDoctorDetails(initialDoctorDetails);
-      setIsSendingDetails(false);
-    }, 5000);
+    if (formMode == "signup") {
+      const { responseData, error } = await addDoctor(doctorDetails);
+
+      if (error) {
+        addError(error);
+        setIsSendingDetails(false);
+        return;
+      }
+      if (!responseData.token) {
+        addError(responseData.message);
+        setIsSendingDetails(false);
+        return;
+      }
+      addSuccess("Signup success");
+      handleSetCookie(responseData.token);
+    } else if (formMode == "edit") {
+      const { responseData, error } = await editDoctor(doctorDetails);
+      if (error) {
+        addError(error);
+        setIsSendingDetails(false);
+        return;
+      }
+      if (!responseData.updated) {
+        addError(responseData.message);
+        setIsSendingDetails(false);
+        return;
+      }
+      addSuccess("Edit success");
+      navigate(-1)
+    }
+    setIsSendingDetails(false);
   };
 
   const makeDataRequest = async () => {
     // base on form mode set data
-    setTimeout(() => {
-      if (formMode == "signup") {
-        setDoctorDetails(initialDoctorDetails);
-      } else if (formMode == "edit") {
-        // get data from srver using token
-        // for now data is set to initia
-        setDoctorDetails(SampleDoctors[0]);
+    setIsLaoding(true);
+
+    if (formMode == "signup") {
+      setDoctorDetails(initialDoctorDetails);
+    } else if (formMode == "edit") {
+      // get data from srver using token
+      // for now data is set to initia
+      const { responseData, error } = await getDoctorUsingCookie();
+      if (error) {
+        addError(error);
+        setIsLaoding(false);
+        return;
       }
-      setIsLaoding(false);
-    }, 1000);
+      if (!responseData.data) {
+        addError(responseData.message);
+        setIsLaoding(false);
+        return;
+      }
+      setDoctorDetails({
+        ...responseData.data,
+        appointmentHoursStart: responseData.data.appointmentHours.start,
+        appointmentHoursEnd: responseData.data.appointmentHours.end,
+      });
+    }
+    setIsLaoding(false);
   };
 
   useEffect(() => {
-    setIsLaoding(true);
     makeDataRequest();
   }, []);
 
@@ -422,12 +468,12 @@ export default function DoctorSignUp({ formMode = "signup" }) {
               <div className="  flex flex-col justify-center gap-1 text-xs text-textColor">
                 <p>
                   Already have an account?{" "}
-                  <a
-                    href="/get-started/login"
+                  <Link
+                    to={"/get-started/login"}
                     className="font-semibold underline hover:scale-95"
                   >
                     Login
-                  </a>
+                  </Link>
                 </p>
               </div>
             </>

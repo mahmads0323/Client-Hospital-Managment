@@ -5,6 +5,11 @@ import FormSelecetInput from "../../Components/formSelectInput";
 import useErrorContext from "../../context/errorContext";
 import Loader from "../../Components/loader";
 import { SamplePatients } from "../../sampleData/samplePatients";
+import addPatient from "../../services/patient/addPatient";
+import useUserContext from "../../context/userContext";
+import { Link, useNavigate } from "react-router-dom";
+import editPatient from "../../services/patient/editDetails";
+import getByCookie from "../../services/patient/getByCookie";
 
 const initialPatientDetails = {
   name: "",
@@ -24,7 +29,11 @@ export default function PatientSignUp({ formMode = "signup" }) {
   const [patientDetails, setPatientDetails] = useState({});
   const [isLoading, setIsLaoding] = useState(true);
   const [isSendingDetails, setIsSendingDetails] = useState(false);
-  const { addError } = useErrorContext();
+
+  const navigate = useNavigate();
+
+  const { addError, addSuccess } = useErrorContext();
+  const { handleSetCookie } = useUserContext();
 
   const handleNameChange = (e) => {
     setPatientDetails((prev) => ({ ...prev, name: e.target.value }));
@@ -61,7 +70,7 @@ export default function PatientSignUp({ formMode = "signup" }) {
     }));
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
 
     // validate name length
@@ -78,7 +87,9 @@ export default function PatientSignUp({ formMode = "signup" }) {
 
     // validate cnic
     if (patientDetails.cnic.length != 13) {
-      addError("Invalid cnic, please remove '-' if included");
+      addError(
+        "Invalid cnic, cnic should be 13 digit count or remove '-' if included"
+      );
       return;
     }
 
@@ -112,30 +123,68 @@ export default function PatientSignUp({ formMode = "signup" }) {
 
     // send data to differnt apis based on formmMode
     setIsSendingDetails(true);
-    console.log("Patient details: ", patientDetails);
-    setTimeout(() => {
-      // setPatientDetails(initialPatientDetails);
+    if (formMode == "signup") {
+      const { responseData, error } = await addPatient(patientDetails);
 
-      setIsSendingDetails(false);
-    }, 5000);
+      if (error) {
+        addError(error);
+        setIsSendingDetails(false);
+        return;
+      }
+      if (!responseData.token) {
+        addError(responseData.message);
+        setIsSendingDetails(false);
+        return;
+      }
+      addSuccess("Signup success");
+      handleSetCookie(responseData.token);
+    } else if (formMode == "edit") {
+      const { responseData, error } = await editPatient(patientDetails);
+
+      if (error) {
+        addError(error);
+        setIsSendingDetails(false);
+        return;
+      }
+      if (!responseData.updated) {
+        addError(responseData.message);
+        setIsSendingDetails(false);
+        return;
+      }
+      addSuccess("edit success");
+    }
+
+    setIsSendingDetails(false);
+    navigate(-1)
   };
 
   const makeDataRequest = async () => {
     // base on form mode set data
-    setTimeout(() => {
-      if (formMode == "signup") {
-        setPatientDetails(initialPatientDetails);
-      } else if (formMode == "edit") {
-        // get data from srver using token
-        // for now data is set to initia
-        setPatientDetails(SamplePatients[0]);
+    setIsLaoding(true);
+
+    if (formMode == "signup") {
+      setPatientDetails(initialPatientDetails);
+    } else if (formMode == "edit") {
+      // get data from srver using token
+      // for now data is set to initia
+
+      const { reponseData, error } = await getByCookie();
+      if (error) {
+        addError(error);
+        setIsLaoding(false);
+        return;
       }
-      setIsLaoding(false);
-    }, 1000);
+      if (!reponseData.data) {
+        addError(reponseData.message);
+        setIsLaoding(false);
+        return;
+      }
+      setPatientDetails(reponseData.data);
+    }
+    setIsLaoding(false);
   };
 
   useEffect(() => {
-    setIsLaoding(true);
     makeDataRequest();
   }, []);
 
@@ -144,145 +193,148 @@ export default function PatientSignUp({ formMode = "signup" }) {
       {isLoading ? (
         <Loader />
       ) : (
-        <form
-          className="mt-8 space-y-2 w-full flex flex-col"
-          onSubmit={onSubmit}
-        >
-          <label>
-            <p className="text-sm text-textColor">Name</p>
-            <FormInput
-              id="name"
-              name="name"
-              type="text"
-              required={true}
-              placeholder="Name"
-              value={patientDetails.name}
-              handleChange={handleNameChange}
+        <>
+          <form
+            className="mt-8 space-y-2 w-full flex flex-col"
+            onSubmit={onSubmit}
+          >
+            <label>
+              <p className="text-sm text-textColor">Name</p>
+              <FormInput
+                id="name"
+                name="name"
+                type="text"
+                required={true}
+                placeholder="Name"
+                value={patientDetails.name}
+                handleChange={handleNameChange}
+              />
+            </label>
+            <label>
+              <p className="text-sm text-textColor">Email</p>
+              <FormInput
+                id="email-address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required={true}
+                placeholder="Email address"
+                value={patientDetails.email}
+                handleChange={handleEmailChange}
+              />
+            </label>
+            <label>
+              <p className="text-sm text-textColor">Cnic</p>
+              <FormInput
+                id="cnic"
+                name="cnic"
+                type="text"
+                autoComplete="cnic"
+                required={true}
+                placeholder="Cnic"
+                value={patientDetails.cnic}
+                handleChange={handleCnicChange}
+              />
+            </label>
+
+            <label>
+              <p className="text-sm text-textColor">Age</p>
+              <FormInput
+                id="age"
+                name="age"
+                type="number"
+                autoComplete="age"
+                required={true}
+                placeholder="Age"
+                value={patientDetails.age}
+                handleChange={handleAgeChange}
+              />
+            </label>
+
+            <label>
+              <p className="text-sm text-textColor">Gender</p>
+              <FormSelecetInput
+                handleOnChange={handleGenderChange}
+                value={patientDetails.gender}
+                options={[
+                  { value: "male", text: "Male" },
+                  { value: "female", text: "Female" },
+                ]}
+              />
+            </label>
+
+            <label>
+              <p className="text-sm text-textColor">Address</p>
+              <FormInput
+                id="address"
+                name="address"
+                type="text"
+                autoComplete="adddress"
+                required={false}
+                placeholder="Address"
+                value={patientDetails.address}
+                handleChange={handleAddressChange}
+              />
+            </label>
+
+            {formMode == "signup" && (
+              <>
+                <label>
+                  <p className="text-sm text-textColor">Password</p>
+                  <FormInput
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required={true}
+                    placeholder="Password"
+                    value={patientDetails.password}
+                    handleChange={handlePasswordChange}
+                  />
+                </label>
+
+                <label>
+                  <p className="text-sm text-textColor">Confirm password</p>
+                  <FormInput
+                    id="confirm-password"
+                    name="confirm-password"
+                    type="password"
+                    required={true}
+                    placeholder="Confirm Password"
+                    value={patientDetails.confirmPassword}
+                    handleChange={handleConfirmPasswordChange}
+                  />
+                  {patientDetails.password != "" &&
+                    patientDetails.confirmPassword != "" &&
+                    patientDetails.password !=
+                      patientDetails.confirmPassword && (
+                      <p className="text-xs text-red-700">
+                        password do not match
+                      </p>
+                    )}
+                </label>
+              </>
+            )}
+
+            <div className="  flex flex-col justify-center gap-1 text-xs text-textColor">
+              <p>
+                Already have an account?{" "}
+                <Link
+                  to={"/get-started/login"}
+                  className="font-semibold underline hover:scale-95"
+                >
+                  Login
+                </Link>
+              </p>
+            </div>
+
+            <Button
+              type="submit"
+              text={formMode == "signup" ? "Sign up" : "Update"}
+              disabled={isSendingDetails}
             />
-          </label>
-          <label>
-            <p className="text-sm text-textColor">Email</p>
-            <FormInput
-              id="email-address"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required={true}
-              placeholder="Email address"
-              value={patientDetails.email}
-              handleChange={handleEmailChange}
-            />
-          </label>
-          <label>
-            <p className="text-sm text-textColor">Cnic</p>
-            <FormInput
-              id="cnic"
-              name="cnic"
-              type="text"
-              autoComplete="cnic"
-              required={true}
-              placeholder="Cnic"
-              value={patientDetails.cnic}
-              handleChange={handleCnicChange}
-            />
-          </label>
-
-          <label>
-            <p className="text-sm text-textColor">Age</p>
-            <FormInput
-              id="age"
-              name="age"
-              type="number"
-              autoComplete="age"
-              required={true}
-              placeholder="Age"
-              value={patientDetails.age}
-              handleChange={handleAgeChange}
-            />
-          </label>
-
-          <label>
-            <p className="text-sm text-textColor">Gender</p>
-            <FormSelecetInput
-              handleOnChange={handleGenderChange}
-              value={patientDetails.gender}
-              options={[
-                { value: "male", text: "Male" },
-                { value: "female", text: "Female" },
-              ]}
-            />
-          </label>
-
-          <label>
-            <p className="text-sm text-textColor">Address</p>
-            <FormInput
-              id="address"
-              name="address"
-              type="text"
-              autoComplete="adddress"
-              required={false}
-              placeholder="Address"
-              value={patientDetails.address}
-              handleChange={handleAddressChange}
-            />
-          </label>
-
-          {formMode == "signup" && (
-            <>
-              <label>
-                <p className="text-sm text-textColor">Password</p>
-                <FormInput
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required={true}
-                  placeholder="Password"
-                  value={patientDetails.password}
-                  handleChange={handlePasswordChange}
-                />
-              </label>
-
-              <label>
-                <p className="text-sm text-textColor">Confirm password</p>
-                <FormInput
-                  id="confirm-password"
-                  name="confirm-password"
-                  type="password"
-                  required={true}
-                  placeholder="Confirm Password"
-                  value={patientDetails.confirmPassword}
-                  handleChange={handleConfirmPasswordChange}
-                />
-                {patientDetails.password != "" &&
-                  patientDetails.confirmPassword != "" &&
-                  patientDetails.password != patientDetails.confirmPassword && (
-                    <p className="text-xs text-red-700">
-                      password do not match
-                    </p>
-                  )}
-              </label>
-
-              <div className="  flex flex-col justify-center gap-1 text-xs text-textColor">
-                <p>
-                  Already have an account?{" "}
-                  <a
-                    href="/get-started/login"
-                    className="font-semibold underline hover:scale-95"
-                  >
-                    Login
-                  </a>
-                </p>
-              </div>
-            </>
-          )}
-
-          <Button
-            type="submit"
-            text={formMode == "signup" ? "Sign up" : "Update"}
-            disabled={isSendingDetails}
-          />
-        </form>
+          </form>
+        </>
       )}
     </>
   );

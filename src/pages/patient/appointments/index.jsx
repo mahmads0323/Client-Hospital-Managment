@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import AppointmentTable from "../../../Components/appointmentsTable";
 import CustomLink from "../../../Components/link";
-import { SampleAppintments } from "../../../sampleData/sampleAppointments";
-import { SamplePatients } from "../../../sampleData/samplePatients";
 import Loader from "../../../Components/loader";
+import getAllAppointments from "../../../services/appointment/getAll";
+import useErrorContext from "../../../context/errorContext";
 
 const itemsToShowAtATime = 5;
-const sampleUser = SamplePatients[0];
 
 export default function Appointments() {
-  const [pateint, setPatient] = useState({});
   const [appointments, setAppoinments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [itemsRange, setItemsRange] = useState({
@@ -17,34 +15,33 @@ export default function Appointments() {
     end: itemsToShowAtATime - 1,
   });
   const [totalItems, setTotalItems] = useState(0);
+  const { addError } = useErrorContext();
 
-  const makePatientDataRequest = () => {
-    setTimeout(() => {
-      setPatient(sampleUser);
-    }, 500);
-  };
-
-  const makePateintAppointmentRequest = () => {
+  const makePateintAppointmentRequest = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      const tempAppointments = SampleAppintments.filter(
-        (appointmentItem) => appointmentItem.patientId == pateint.id
-      );
-      setAppoinments(
-        tempAppointments.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempAppointments.length); // for now
+    const { reponseData, error } = await getAllAppointments(
+      itemsToShowAtATime,
+      itemsRange.start
+    );
+    if (error) {
+      addError(error);
       setIsLoading(false);
-    }, 500);
-  };
+      return;
+    }
+    if (!reponseData.data) {
+      addError(reponseData.message);
+      setIsLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    makePatientDataRequest();
-  });
+    setTotalItems(reponseData.count);
+    setAppoinments(reponseData.data);
+    setIsLoading(false)
+  };
 
   useEffect(() => {
     makePateintAppointmentRequest();
-  }, [pateint, itemsRange]);
+  }, [itemsRange]);
   return (
     <section className="w-full flex flex-col ">
       <div className="w-full flex justify-center space-x-1 my-2  md:my-4 lg:my-6">

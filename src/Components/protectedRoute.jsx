@@ -10,23 +10,26 @@ export default function ProtectedRoute({
 }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pageLoaded, setPageLoaded] = useState(false);
-  const { currentRole } = useUserContext();
+  const { validateRoleDataRequest } = useUserContext();
 
-  const validate = () => {
+  const validate = async () => {
     setPageLoaded(false);
-    setTimeout(() => {
-      if (allowedRole == currentRole) {
-        setIsAuthenticated(true);
-        return;
-      }
-      setIsAuthenticated(false);
-      setPageLoaded(true);
-    }, 500);
+    const userRrole = await validateRoleDataRequest();
+    if (allowedRole == userRrole) {
+      setIsAuthenticated(true);
+      return;
+    }
+    setIsAuthenticated(false);
+    setPageLoaded(true);
   };
+
+  // console.log("isAuthenticated: ", isAuthenticated)
+  // console.log("loaded: ", pageLoaded)
 
   useEffect(() => {
     validate();
-  });
+
+  }, []);
 
   if (isAuthenticated) {
     return <Component {...rest} />; // passing already passed props if any

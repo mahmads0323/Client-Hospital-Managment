@@ -65,7 +65,7 @@ export default function PatientsTable({
           <tr className=" bg-designColor1 text-white">
             <th className="px-2 py-1 md:px-4 md:py-2 text-left">#</th>
             <th className="px-2 py-1 md:px-4 md:py-2 text-center">Patient</th>
-            <th className="px-2 py-1 md:px-4 md:py-2 text-center">Id</th>
+            <th className="px-2 py-1 md:px-4 md:py-2 text-center">CNIC</th>
             <th className="px-2 py-1 md:px-4 md:py-2 text-right">Action</th>
           </tr>
         </thead>
@@ -85,12 +85,12 @@ export default function PatientsTable({
                     {patient.name}
                   </td>
                   <td className="px-2 py-1 md:px-4 md:py-2 text-center">
-                    {patient.id}
+                    {patient.cnic}
                   </td>
                   <td className="px-2 py-1 md:px-4 md:py-2 text-right">
                     <Button
                       text={"profile"}
-                      handleOnClick={() => handlePatientView(patient.id)}
+                      handleOnClick={() => handlePatientView(patient._id)}
                     />
                   </td>
                 </tr>

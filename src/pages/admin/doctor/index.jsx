@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import Loader from "../../../Components/loader";
 import DoctorTable from "../../../Components/doctorTable";
-import { SampleDoctors } from "../../../sampleData/sampleDoctors";
+import getDoctorsByStatus from "../../../services/doctor/getByStatus";
+import useErrorContext from "../../../context/errorContext";
 
-const sampleDoctor = SampleDoctors[0];
 const itemsToShowAtATime = 5;
 
 export default function Doctors() {
-  const [admin, setAdmin] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
+  const { addError } = useErrorContext();
 
   //   approved doctors
   const [approvedDoctors, setApprovedDoctors] = useState([]);
@@ -30,119 +29,110 @@ export default function Doctors() {
   });
   const [pendingDoctorTotalItems, setPendingDoctorTotalItems] = useState(0);
 
-  const makeAdminDataRequest = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setAdmin(sampleDoctor);
-      setIsLoading(false);
-    }, 500);
-  };
-
-  const makeApprovedDoctorsDataRequest = () => {
+  const makeApprovedDoctorsDataRequest = async () => {
     setApprovedDoctorsLoading(true);
-    setTimeout(() => {
-      const tempDoctors = SampleDoctors.filter(
-        (doctorItem) => doctorItem.status == "approved"
-      );
-      console.log("Temp: ", tempDoctors);
-      setApprovedDoctors(
-        tempDoctors.slice(
-          approvedDoctorItemsRange.start,
-          approvedDoctorItemsRange.end + 1
-        )
-      );
-      setApprovedDoctorTotalItems(tempDoctors.length);
+    const { responseData, error } = await getDoctorsByStatus(
+      itemsToShowAtATime,
+      approvedDoctorItemsRange.start,
+      "approved"
+    );
+    if (error) {
+      addError(error);
       setApprovedDoctorsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setApprovedDoctorsLoading(false);
+      return;
+    }
+    setApprovedDoctorTotalItems(responseData.count);
+    setApprovedDoctors(responseData.data);
+    setApprovedDoctorsLoading(false);
   };
 
-  const makePendingDoctorsDataRequest = () => {
+  const makePendingDoctorsDataRequest = async () => {
     setPendingDoctorsLoading(true);
-    setTimeout(() => {
-      const tempDoctors = SampleDoctors.filter(
-        (doctorItem) => doctorItem.status == "pending"
-      );
-      setPendingDoctors(
-        tempDoctors.slice(
-          pendingDoctorItemsRange.start,
-          pendingDoctorItemsRange.end + 1
-        )
-      );
-      setPendingDoctorTotalItems(tempDoctors.length);
+    const { responseData, error } = await getDoctorsByStatus(
+      itemsToShowAtATime,
+      approvedDoctorItemsRange.start,
+      "pending"
+    );
+    if (error) {
+      addError(error);
       setPendingDoctorsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setPendingDoctorsLoading(false);
+      return;
+    }
+    setPendingDoctorTotalItems(responseData.count);
+    setPendingDoctors(responseData.data);
+    setPendingDoctorsLoading(false);
   };
-
-  useEffect(() => {
-    makeAdminDataRequest();
-  }, []);
 
   useEffect(() => {
     makeApprovedDoctorsDataRequest();
-  }, [admin, approvedDoctorItemsRange]);
+  }, [approvedDoctorItemsRange]);
 
   useEffect(() => {
     makePendingDoctorsDataRequest();
-  }, [admin, pendingDoctorItemsRange]);
+  }, [pendingDoctorItemsRange]);
 
   return (
     <section className="w-full flex flex-col ">
-      {isLoading ? (
-        <Loader />
-      ) : (
-        <>
-          {/* Approved doctors */}
+      {/* pending doctors */}
 
-          <div className="w-full flex justify-center space-x-1 my-2  md:my-4 lg:my-6">
-            <p className="text-textColor font-medium  md:text-lg lg:text-xl ">
-              Approved Doctor(s)
-            </p>
-          </div>
-
+      <div className="w-full flex justify-center space-x-1 my-2  md:my-4 lg:my-6">
+        <p className="text-textColor font-medium  md:text-lg lg:text-xl ">
+          Pending Doctor(s)
+        </p>
+      </div>
+      <div className="px-2 ">
+        {pendingDoctorsLoading ? (
+          <Loader />
+        ) : (
           <div className="px-2 ">
-            {approvedDoctorsLoading ? (
-              <Loader />
-            ) : (
-              <div className="px-2 ">
-                <DoctorTable
-                  doctors={approvedDoctors}
-                  tableTitle={"Notifications"}
-                  itemsRange={approvedDoctorItemsRange}
-                  itemsToShowAtATime={itemsToShowAtATime}
-                  totalItems={approvedDoctorTotalItems}
-                  setItemsRange={setApprovedDoctorItemsRange}
-                  viewRole="admin"
-                />
-              </div>
-            )}
+            <DoctorTable
+              doctors={pendingDoctors}
+              tableTitle={"Pending Doctors"}
+              itemsRange={pendingDoctorItemsRange}
+              itemsToShowAtATime={itemsToShowAtATime}
+              totalItems={pendingDoctorTotalItems}
+              setItemsRange={setPendingDoctorItemsRange}
+              viewRole="admin"
+            />
           </div>
+        )}
+      </div>
 
-          {/* pending doctors */}
+      {/* Approved doctors */}
 
-          <div className="w-full flex justify-center space-x-1 my-2  md:my-4 lg:my-6">
-            <p className="text-textColor font-medium  md:text-lg lg:text-xl ">
-              Pending Doctor(s)
-            </p>
-          </div>
+      <div className="w-full flex justify-center space-x-1 my-2  md:my-4 lg:my-6">
+        <p className="text-textColor font-medium  md:text-lg lg:text-xl ">
+          Approved Doctor(s)
+        </p>
+      </div>
+
+      <div className="px-2 ">
+        {approvedDoctorsLoading ? (
+          <Loader />
+        ) : (
           <div className="px-2 ">
-            {pendingDoctorsLoading ? (
-              <Loader />
-            ) : (
-              <div className="px-2 ">
-                <DoctorTable
-                  doctors={pendingDoctors}
-                  tableTitle={"Pending Doctors"}
-                  itemsRange={pendingDoctorItemsRange}
-                  itemsToShowAtATime={itemsToShowAtATime}
-                  totalItems={pendingDoctorTotalItems}
-                  setItemsRange={setPendingDoctorItemsRange}
-                  viewRole="admin"
-                />
-              </div>
-            )}
+            <DoctorTable
+              doctors={approvedDoctors}
+              tableTitle={"Notifications"}
+              itemsRange={approvedDoctorItemsRange}
+              itemsToShowAtATime={itemsToShowAtATime}
+              totalItems={approvedDoctorTotalItems}
+              setItemsRange={setApprovedDoctorItemsRange}
+              viewRole="admin"
+            />
           </div>
-        </>
-      )}
+        )}
+      </div>
     </section>
   );
 }

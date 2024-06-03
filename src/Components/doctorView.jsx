@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import USER_PROFILE from "/user-regular.png";
-import { SampleDoctors } from "../sampleData/sampleDoctors";
 import Loader from "./loader";
 import Button from "./button";
 import { useNavigate, useParams } from "react-router-dom";
 import NotFoundPage from "../pages/not-found";
-import { sendNotification } from "./utils/sendNotification";
+import getDoctorById from "../services/doctor/getById";
+import useErrorContext from "../context/errorContext";
+import approveDoctorById from "../services/doctor/approve";
+import createNotification from "../services/notification/createNotification";
 
 export default function DoctorView({ viewRole = "patient" }) {
   const params = useParams();
@@ -15,47 +17,68 @@ export default function DoctorView({ viewRole = "patient" }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const navigate = useNavigate();
+  const { addError } = useErrorContext();
 
-  const makeDataRequest = () => {
-    setTimeout(() => {
-      const temp = SampleDoctors.find((e) => e.id == doctorId);
-      if (!temp) {
-        setIsLoading(false);
-        setDoctorDetailsFound(false);
-        return;
-      }
-      console.log("temp: ", temp);
-      const tempIndex = SampleDoctors.findIndex((e) => e.id == temp.id);
-      SampleDoctors[tempIndex].viewed = true;
-
-      setDoctorDetails(temp);
+  const makeDataRequest = async () => {
+    setIsLoading(true);
+    const { responseData, error } = await getDoctorById(doctorId);
+    if (error) {
+      setDoctorDetailsFound(false);
+      addError(error);
       setIsLoading(false);
-      setDoctorDetailsFound(true);
-    }, 2000);
+      return;
+    }
+    if (!responseData.data) {
+      setDoctorDetailsFound(false);
+      addError(responseData.message);
+      setIsLoading(false);
+      return;
+    }
+    setDoctorDetailsFound(true);
+    setDoctorDetails(responseData.data);
+    setIsLoading(false);
   };
 
-  const handleApproveDoctor = (doctorId) => {
-    const tempDoctor = SampleDoctors.find(
-      (doctorItem) => doctorItem.id == doctorDetails.id
-    );
-    const tempDoctorIndex = SampleDoctors.findIndex(
-      (doctorItem) => doctorItem.id == doctorDetails.id
-    );
-    tempDoctor.status = "approved";
-    SampleDoctors[tempDoctorIndex] = tempDoctor;
+  const sendNotification = async (fromId, toId, fromName, title, message) => {
+    const { responseData, error } = await createNotification({
+      fromId,
+      toId,
+      fromName,
+      title,
+      message,
+    });
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!responseData.added) {
+      addError(responseData.message);
+      return;
+    }
+  };
+
+  const handleApproveDoctor = async () => {
+    const { responseData, error } = await approveDoctorById(doctorId);
+    if (error) {
+      addError(error);
+      return;
+    }
+    if (!responseData.approved) {
+      addError(responseData.message);
+      return;
+    }
 
     // send notification of approval
-    const message =
-      "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+    const message = "You have been approved by admin";
     sendNotification(
-      0, // admin by default
-      tempDoctor.id,
-      viewRole,
+      1, // admin by default
+      doctorDetails.id,
+      doctorDetails.name,
       "approval of doctor",
       message
     );
 
-    navigate(-1)
+    navigate(-1);
   };
 
   const handleGoBack = () => {

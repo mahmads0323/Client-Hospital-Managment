@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { SampleDoctors } from "../../../sampleData/sampleDoctors";
-import { SampleAppintments } from "../../../sampleData/sampleAppointments";
 import Loader from "../../../Components/loader";
 import AppointmentTable from "../../../Components/appointmentsTable";
 import CustomLink from "../../../Components/link";
+import getDoctorUsingCookie from "../../../services/doctor/getDoctorUsingCookie";
+import useErrorContext from "../../../context/errorContext";
+import getByStatus from "../../../services/appointment/getByStatus";
 
-const sampleDoctor = SampleDoctors[0];
 const itemsToShowAtATime = 5;
 
 export default function Home() {
@@ -20,28 +20,45 @@ export default function Home() {
   });
   const [totalItems, setTotalItems] = useState(0);
 
+  const { addError } = useErrorContext();
+
   const makeDataRequest = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setDoctor(sampleDoctor);
+    const { responseData, error } = await getDoctorUsingCookie();
+    if (error) {
+      addError(error);
       setIsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setIsLoading(false);
+      return;
+    }
+    setDoctor(responseData.data);
+    setIsLoading(false);
   };
 
   const makeScheduledAppointmentsRequest = async () => {
     setScheduledAppointmentsLoading(true);
-    console.log("Doctor id: ", doctor.id);
-    setTimeout(() => {
-      const tempAppointments = SampleAppintments.filter(
-        (appointment) =>
-          appointment.status == "scheduled" && appointment.doctorId == doctor.id
-      );
-      setScheduledAppointmnts(
-        tempAppointments.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempAppointments.length); // for now
+    const { reponseData, error } = await getByStatus(
+      "scheduled",
+      itemsToShowAtATime,
+      itemsRange.start
+    );
+    if (error) {
+      addError(error);
       setScheduledAppointmentsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!reponseData.data) {
+      addError(reponseData.message);
+      setScheduledAppointmentsLoading(false);
+      return;
+    }
+    setTotalItems(reponseData.count);
+    setScheduledAppointmnts(reponseData.data);
+    setScheduledAppointmentsLoading(false);
   };
 
   useEffect(() => {
@@ -82,6 +99,19 @@ export default function Home() {
               </h2>
               <h2>
                 Age: <span className="font-semibold">{doctor.age}</span>
+              </h2>
+
+              <h2>
+                Status:{" "}
+                <span
+                  className={`${
+                    doctor.status == "pending"
+                      ? "bg-red-500"
+                      : "bg-designColor1"
+                  } text-white px-1 rounded`}
+                >
+                  {doctor.status}
+                </span>
               </h2>
 
               <CustomLink to="/doctor/edit" text={"Edit"} />

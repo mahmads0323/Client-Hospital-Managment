@@ -6,6 +6,9 @@ import AppointmentTable from "./appointmentsTable";
 import { useParams } from "react-router-dom";
 import { SampleDoctors } from "../sampleData/sampleDoctors";
 import NotFoundPage from "../pages/not-found";
+import getPatientById from "../services/patient/getById";
+import useErrorContext from "../context/errorContext";
+import getByUser from "../services/appointment/getByUser";
 
 const itemsToShowAtATime = 5;
 const sampleDoctor = SampleDoctors[0];
@@ -28,6 +31,7 @@ export default function PatientView({ viewRole = "doctor" }) {
 
   const params = useParams();
   const { patientId } = params;
+  const { addError } = useErrorContext();
 
   const makeDoctorDataRequest = () => {
     setDoctorLoading(true);
@@ -37,39 +41,47 @@ export default function PatientView({ viewRole = "doctor" }) {
     }, 500);
   };
 
-  const makePatientDataRequest = () => {
-    setTimeout(() => {
-      setPatientLoading(true);
-      setPatientFound(false);
-      const tempPatient = SamplePatients.find(
-        (patientItem) => patientItem.id == patientId
-      );
-      if (!tempPatient) {
-        setPatientFound(false);
-        setPatientLoading(false);
-        return;
-      }
-      setPatient(tempPatient);
+  const makePatientDataRequest = async () => {
+    setPatientLoading(true);
+    const { responseData, error } = await getPatientById(patientId);
+    if (error) {
+      addError(error);
       setPatientLoading(false);
-      setPatientFound(true);
-    }, 500);
+      setPatientFound(false);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setPatientLoading(false);
+      setPatientFound(false);
+      return;
+    }
+    setPatient(responseData.data);
+    setPatientLoading(false);
+    setPatientFound(true);
   };
 
   const makeAppointmentsDataRequest = async () => {
-    setPatientLoading(true);
-    setTimeout(() => {
-      const patientAppointmentIds = patient.appointmentIds;
-      const tempAppointments = SampleAppintments.filter(
-        (appointmentItem) =>
-          appointmentItem.doctorId == doctor.id &&
-          patientAppointmentIds.includes(appointmentItem.id)
-      );
-      setAppointments(
-        tempAppointments.slice(itemsRange.start, itemsRange.end + 1)
-      );
-      setTotalItems(tempAppointments.length); // for now
+    setAppointmentsLoading(true);
+    const { responseData, error } = await getByUser(
+      itemsToShowAtATime,
+      itemsRange.start,
+      "patient",
+      patientId
+    );
+    if (error) {
+      addError(error);
       setAppointmentsLoading(false);
-    }, 500);
+      return;
+    }
+    if (!responseData.data) {
+      addError(responseData.message);
+      setAppointmentsLoading(false);
+      return;
+    }
+    setTotalItems(responseData.count);
+    setAppointments(responseData.data);
+    setAppointmentsLoading(false);
   };
 
   useEffect(() => {
@@ -81,7 +93,9 @@ export default function PatientView({ viewRole = "doctor" }) {
   }, [doctor]);
 
   useEffect(() => {
-    makeAppointmentsDataRequest();
+    if (patientFound) {
+      makeAppointmentsDataRequest();
+    }
   }, [patient]);
 
   if (!patientFound) {

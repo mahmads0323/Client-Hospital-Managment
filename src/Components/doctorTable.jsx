@@ -25,7 +25,7 @@ export default function DoctorTable({
   };
 
   const handlePrevClick = () => {
-    console.log(itemsRange);
+
 
     if (itemsRange.start - itemsToShowAtATime >= 0) {
       if (itemsRange.start - itemsRange.end == 0) {
