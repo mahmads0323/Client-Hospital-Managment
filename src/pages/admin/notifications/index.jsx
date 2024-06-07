@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import Loader from "../../../Components/loader";
 import NotificationTable from "../../../Components/notificationTable";
-import { SampleAdmins } from "../../../sampleData/sampleAdmins";
 import useErrorContext from "../../../context/errorContext";
 import getAllNotification from "../../../services/notification/getAllNotification";
 
