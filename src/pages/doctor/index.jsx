@@ -47,7 +47,7 @@ export default function Doctor() {
 
             <Route
               path="*"
-              element={<NotFoundPage redirectTo={"/doctorF"} />}
+              element={<NotFoundPage redirectTo={"/doctor"} />}
             />
           </Route>
         </Routes>
